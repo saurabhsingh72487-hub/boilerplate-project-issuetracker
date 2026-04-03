@@ -1,61 +1,31 @@
 'use strict';
 
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const mongoose = require('mongoose');
-require('dotenv').config();
-
-const apiRoutes = require('./routes/api.js');
-const fccTestingRoutes = require('./routes/fcctesting.js');
-const runner = require('./test-runner');
+const multer = require('multer');
 
 const app = express();
-
-console.log('MONGO_URI =', process.env.MONGO_URI);
+const upload = multer({ dest: 'uploads/' });
 
 app.use('/public', express.static(process.cwd() + '/public'));
 app.use(cors({ origin: '*' }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
-app.route('/:project/').get(function (req, res) {
-  res.sendFile(process.cwd() + '/views/issue.html');
-});
-
-app.route('/').get(function (req, res) {
+app.get('/', function (req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-fccTestingRoutes(app);
-apiRoutes(app);
+app.post('/api/fileanalyse', upload.single('upfile'), function (req, res) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
 
-app.use(function(req, res) {
-  res.status(404).type('text').send('Not Found');
+  res.json({
+    name: req.file.originalname,
+    type: req.file.mimetype,
+    size: req.file.size
+  });
 });
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('MongoDB connected');
-
-    const listener = app.listen(process.env.PORT || 3000, function () {
-      console.log('Your app is listening on port ' + listener.address().port);
-
-      if (process.env.NODE_ENV === 'test') {
-        console.log('Running Tests...');
-        setTimeout(function () {
-          try {
-            runner.run();
-          } catch (e) {
-            console.log('Tests are not valid:');
-            console.error(e);
-          }
-        }, 3500);
-      }
-    });
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err);
-  });
-
-module.exports = app;
+const listener = app.listen(process.env.PORT || 3000, function () {
+  console.log('Your app is listening on port ' + listener.address().port);
+});
