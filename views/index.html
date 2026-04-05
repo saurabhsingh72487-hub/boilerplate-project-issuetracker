@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>File Metadata</title>
+    <title>Issue Tracker</title>
     <link
       rel="shortcut icon"
       href="https://cdn.freecodecamp.org/universal/favicons/favicon-32x32.png"
       type="image/x-icon"
     />
     <link
-      href="https://fonts.googleapis.com/css?family=Roboto"
+      href="https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
       rel="stylesheet"
       type="text/css"
     />
@@ -17,29 +17,65 @@
 
   <body>
     <div class="container">
-      <h1>API Project: File Metadata Microservice</h1>
-
-      <h2>Usage:</h2>
-      <p>Please Upload a File ...</p>
-
-      <div class="view">
-        <h3 id="output"></h3>
-        <form
-          enctype="multipart/form-data"
-          method="POST"
-          action="/api/fileanalyse"
-        >
-          <input id="inputfield" type="file" name="upfile" />
-          <input id="button" type="submit" value="Upload" />
+      <h1 class="header">Issue Tracker</h1>
+      
+      <div class="form-container">
+        <h2>Create New Issue</h2>
+        <form id="issue-form">
+          <div class="form-group">
+            <label for="issue_title">Issue Title: *</label>
+            <input type="text" id="issue_title" name="issue_title" required />
+          </div>
+          
+          <div class="form-group">
+            <label for="issue_text">Issue Text: *</label>
+            <textarea id="issue_text" name="issue_text" required></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="created_by">Created By: *</label>
+            <input type="text" id="created_by" name="created_by" required />
+          </div>
+          
+          <div class="form-group">
+            <label for="assigned_to">Assigned To:</label>
+            <input type="text" id="assigned_to" name="assigned_to" />
+          </div>
+          
+          <div class="form-group">
+            <label for="status_text">Status Text:</label>
+            <input type="text" id="status_text" name="status_text" />
+          </div>
+          
+          <div class="form-group">
+            <label for="project">Project: *</label>
+            <select id="project" name="project" required>
+              <option value="project1">Project 1</option>
+              <option value="project2">Project 2</option>
+              <option value="testproject">Test Project</option>
+            </select>
+          </div>
+          
+          <button type="submit">Add Issue</button>
         </form>
+      </div>
+
+      <div class="issues-container">
+        <h2>All Issues</h2>
+        <div class="filters">
+          <input type="text" id="filter-title" placeholder="Filter by title..." />
+          <input type="text" id="filter-text" placeholder="Filter by text..." />
+          <select id="filter-open">
+            <option value="">All Status</option>
+            <option value="true">Open</option>
+            <option value="false">Closed</option>
+          </select>
+          <button id="clear-filters">Clear Filters</button>
+        </div>
+        <div id="issues-list"></div>
       </div>
     </div>
 
-    <div class="footer">
-      <p>
-        by
-        <a href="https://www.freecodecamp.org">freeCodeCamp</a>
-      </p>
-    </div>
+    <script src="/public/bundle.js"></script>
   </body>
 </html>
