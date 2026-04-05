@@ -1,144 +1,114 @@
 'use strict';
 
-const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
-const issueSchema = new mongoose.Schema(
-  {
-    project: { type: String, required: true },
-    issue_title: { type: String, required: true },
-    issue_text: { type: String, required: true },
-    created_by: { type: String, required: true },
-    assigned_to: { type: String, default: '' },
-    status_text: { type: String, default: '' },
-    created_on: { type: Date, default: Date.now },
-    updated_on: { type: Date, default: Date.now },
-    open: { type: Boolean, default: true }
-  },
-  { versionKey: false }
-);
-
-const Issue = mongoose.models.Issue || mongoose.model('Issue', issueSchema);
+let projects = {}; // In-memory storage
 
 module.exports = function (app) {
-  app
-    .route('/api/issues/:project')
-
-    .get(async function (req, res) {
-      try {
-        const project = req.params.project;
-        const queryObj = { project };
-
-        for (const key in req.query) {
-          let value = req.query[key];
-
+  
+  app.route('/api/issues/:project')
+    
+    .post(function (req, res) {
+      const project = req.params.project;
+      const { issue_title, issue_text, created_by, assigned_to, status_text } = req.body;
+      
+      // Validate required fields
+      if (!issue_title || !issue_text || !created_by) {
+        return res.json({ error: 'required field(s) missing' });
+      }
+      
+      // Initialize project array if it doesn't exist
+      if (!projects[project]) {
+        projects[project] = [];
+      }
+      
+      const issue = {
+        _id: uuidv4(),
+        issue_title,
+        issue_text,
+        created_by,
+        assigned_to: assigned_to || '',
+        status_text: status_text || '',
+        created_on: new Date(),
+        updated_on: new Date(),
+        open: true
+      };
+      
+      projects[project].push(issue);
+      res.json(issue);
+    })
+    
+    .get(function (req, res) {
+      const project = req.params.project;
+      
+      if (!projects[project]) {
+        return res.json([]);
+      }
+      
+      // Filter issues based on query parameters
+      let filteredIssues = projects[project].filter(issue => {
+        return Object.keys(req.query).every(key => {
           if (key === 'open') {
-            value = value === 'true';
+            return String(issue[key]) === req.query[key];
           }
-
-          queryObj[key] = value;
-        }
-
-        const issues = await Issue.find(queryObj).lean();
-        res.json(issues);
-      } catch (err) {
-        res.json([]);
-      }
-    })
-
-    .post(async function (req, res) {
-      try {
-        const project = req.params.project;
-        const {
-          issue_title,
-          issue_text,
-          created_by,
-          assigned_to = '',
-          status_text = ''
-        } = req.body;
-
-        if (!issue_title || !issue_text || !created_by) {
-          return res.json({ error: 'required field(s) missing' });
-        }
-
-        const now = new Date();
-
-        const issue = new Issue({
-          project,
-          issue_title,
-          issue_text,
-          created_by,
-          assigned_to,
-          status_text,
-          created_on: now,
-          updated_on: now,
-          open: true
-        });
-
-        const savedIssue = await issue.save();
-        res.json(savedIssue);
-      } catch (err) {
-        res.json({ error: 'required field(s) missing' });
-      }
-    })
-
-    .put(async function (req, res) {
-      try {
-        const { _id, ...fields } = req.body;
-
-        if (!_id) {
-          return res.json({ error: 'missing _id' });
-        }
-
-        const updateFields = {};
-
-        for (const key in fields) {
-          if (fields[key] !== '') {
-            if (key === 'open') {
-              updateFields[key] =
-                fields[key] === true || fields[key] === 'true';
-            } else {
-              updateFields[key] = fields[key];
-            }
+          if (issue[key] === undefined || issue[key] === null || issue[key] === '') {
+            return false;
           }
-        }
-
-        if (Object.keys(updateFields).length === 0) {
-          return res.json({ error: 'no update field(s) sent', _id });
-        }
-
-        updateFields.updated_on = new Date();
-
-        const updated = await Issue.findByIdAndUpdate(_id, updateFields, {
-          new: true
+          return issue[key].toString().toLowerCase().includes(req.query[key].toLowerCase());
         });
-
-        if (!updated) {
-          return res.json({ error: 'could not update', _id });
-        }
-
-        res.json({ result: 'successfully updated', _id });
-      } catch (err) {
-        res.json({ error: 'could not update', _id: req.body._id });
-      }
+      });
+      
+      res.json(filteredIssues);
     })
-
-    .delete(async function (req, res) {
-      try {
-        const { _id } = req.body;
-
-        if (!_id) {
-          return res.json({ error: 'missing _id' });
-        }
-
-        const deleted = await Issue.findByIdAndDelete(_id);
-
-        if (!deleted) {
-          return res.json({ error: 'could not delete', _id });
-        }
-
-        res.json({ result: 'successfully deleted', _id });
-      } catch (err) {
-        res.json({ error: 'could not delete', _id: req.body._id });
+    
+    .put(function (req, res) {
+      const project = req.params.project;
+      const _id = req.body._id;
+      
+      if (!_id) {
+        return res.json({ error: 'missing _id' });
       }
+      
+      const updateFields = Object.keys(req.body).filter(key => key !== '_id');
+      if (updateFields.length === 0) {
+        return res.json({ error: 'no update field(s) sent', _id });
+      }
+      
+      if (!projects[project]) {
+        return res.json({ error: 'could not update', _id });
+      }
+      
+      const issueIndex = projects[project].findIndex(issue => issue._id === _id);
+      if (issueIndex === -1) {
+        return res.json({ error: 'could not update', _id });
+      }
+      
+      updateFields.forEach(field => {
+        projects[project][issueIndex][field] = req.body[field];
+      });
+      projects[project][issueIndex].updated_on = new Date();
+      
+      res.json({ result: 'successfully updated', _id });
+    })
+    
+    .delete(function (req, res) {
+      const project = req.params.project;
+      const _id = req.body._id;
+      
+      if (!_id) {
+        return res.json({ error: 'missing _id' });
+      }
+      
+      if (!projects[project]) {
+        return res.json({ error: 'could not delete', _id });
+      }
+      
+      const issueIndex = projects[project].findIndex(issue => issue._id === _id);
+      if (issueIndex === -1) {
+        return res.json({ error: 'could not delete', _id });
+      }
+      
+      projects[project].splice(issueIndex, 1);
+      res.json({ result: 'successfully deleted', _id });
     });
 };
